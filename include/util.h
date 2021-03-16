@@ -51,6 +51,8 @@ cv::Mat colorize_surface_normal(const cv::Mat& surface_normal){
         for (size_t x = 0; x < surface_normal.cols; ++x)
         {
             if(surface_normal.at<cv::Vec3f>(y,x)[0] != 0 || surface_normal.at<cv::Vec3f>(y,x)[1] != 0 || surface_normal.at<cv::Vec3f>(y,x)[2] != -1){
+                if(surface_normal.at<cv::Vec3f>(y,x)[2] == 0)
+                    continue;
                 colorized_image.at<cv::Vec3b>(y,x)[0] = uchar(surface_normal.at<cv::Vec3f>(y,x)[0] * 255);
                 colorized_image.at<cv::Vec3b>(y,x)[1] = uchar(surface_normal.at<cv::Vec3f>(y,x)[1] * 255);
                 colorized_image.at<cv::Vec3b>(y,x)[2] = uchar(-1 * surface_normal.at<cv::Vec3f>(y,x)[2] * 255);

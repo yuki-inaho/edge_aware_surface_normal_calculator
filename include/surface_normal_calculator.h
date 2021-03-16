@@ -12,12 +12,13 @@
 class SurfaceNormalCalculator
 {
 public:
-    SurfaceNormalCalculator(CameraParameter camera_parameter, bool enable_edge_filter = true, int32_t scan_line_width_at_2m = 15)
+    SurfaceNormalCalculator(CameraParameter camera_parameter, bool enable_adaptive_scan_line = true, bool enable_edge_filter = true, int32_t scan_line_width_at_2m = 15)
     {
         omp_init_lock(&omp_lock_);
         camera_parameter_ = camera_parameter;
         edge_image_ = cv::Mat::zeros(cv::Size(camera_parameter_.image_width, camera_parameter_.image_height), CV_8UC1);
         enable_edge_filter_ = enable_edge_filter;
+        enable_adaptive_scan_line_ = enable_adaptive_scan_line;
 
         // TODO: Add explanation
         scan_line_model_n_ = (20. - scan_line_width_at_2m) / (double)3.0;
@@ -34,23 +35,32 @@ public:
         ComputeSpatialDifference(frame);
         ComputeDepthEdge(frame);
         NonMaximumSuppression();
+        if (!enable_adaptive_scan_line_)
+            cv::integral(edge_, edge_integral_, CV_32S);
 
         ComputeIntegralImageHorisontal(depth_image_x_dx_, depth_image_x_dx_integral_horisontal_, depth_image_z_dx_, depth_image_z_dx_integral_horisontal_);
-        ComputeEdgeDistanceMapHorizontal(edge_, distance_map_horizontal_);
+        if (enable_adaptive_scan_line_)
+            ComputeEdgeDistanceMapHorizontal(edge_, distance_map_horizontal_);
         ScanLineHorisontal(frame, distance_map_horizontal_);
 
         // TODO: confirm
         cv::Mat depth_image_y_dy_transposed = depth_image_y_dy_.clone().t();
         cv::Mat depth_image_z_dy_transposed = depth_image_z_dy_.clone().t();
+
         ComputeIntegralImageHorisontal(depth_image_y_dy_transposed, depth_image_y_dy_integral_vertical_, depth_image_z_dy_transposed, depth_image_z_dy_integral_vertical_);
-        ComputeEdgeDistanceMapVertical(edge_, distance_map_vertical_);
+        if (enable_adaptive_scan_line_)
+            ComputeEdgeDistanceMapVertical(edge_, distance_map_vertical_);
         ScanLineVertical(frame, distance_map_vertical_);
-
         UpdateEdge();
-
-        ComputeEdgeDistanceMapHorizontal(edge_, distance_map_horizontal_);
-        ComputeEdgeDistanceMapVertical(edge_, distance_map_vertical_);
-
+        if (enable_adaptive_scan_line_)
+        {
+            ComputeEdgeDistanceMapHorizontal(edge_, distance_map_horizontal_);
+            ComputeEdgeDistanceMapVertical(edge_, distance_map_vertical_);
+        }
+        else
+        {
+            cv::integral(edge_, edge_integral_, CV_32S);
+        }
         ComputeSurfaceNormal(frame);
     };
 
@@ -65,9 +75,6 @@ public:
     }
 
 private:
-    cv::Mat depth_image_x_dx_, depth_image_y_dy_, depth_image_z_dx_, depth_image_z_dy_; //Spatial differences of depth image
-    cv::Mat edge_image_;
-
     void ComputeSpatialDifference(const DepthFrame &frame, int32_t kernel_size = 3, float kernel_scale = 1. / 8., int32_t noise_reduction_kernel_size = 3)
     {
         // TODO: no copy
@@ -424,7 +431,7 @@ private:
         const int max_v = depth_image_z_dx_.rows - max_scan_line_width - 2;
         const int max_u = depth_image_z_dx_.cols - max_scan_line_width - 2;
 
-        //#pragma omp parallel for
+        #pragma omp parallel for
         for (int v = max_scan_line_width + 1; v < max_v; ++v)
         {
             int scan_line_width = scan_line_width_init;
@@ -447,11 +454,23 @@ private:
                 int scan_line_width_left = scan_line_width;
                 int scan_line_width_right = scan_line_width;
 
-                if (AdaptScanLine(scan_line_width_left, scan_line_width_right, distance_map_horizontal, u, v, min_scan_line_width) == false)
+                if (enable_adaptive_scan_line_)
                 {
-                    edge_start_index = -1;
-                    max_edge_strength = 0.f;
-                    continue;
+                    if (AdaptScanLine(scan_line_width_left, scan_line_width_right, distance_map_horizontal, u, v, min_scan_line_width) == false)
+                    {
+                        edge_start_index = -1;
+                        max_edge_strength = 0.f;
+                        continue;
+                    }
+                }
+                else
+                {
+                    if (edge_integral_.at<int>(v + 1, u + scan_line_width + 1) - edge_integral_.at<int>(v + 1, u - scan_line_width - 2) - edge_integral_.at<int>(v, u + scan_line_width + 1) + edge_integral_.at<int>(v, u - scan_line_width - 2) != 0)
+                    {
+                        edge_start_index = -1;
+                        max_edge_strength = 0.f;
+                        continue;
+                    }
                 }
 
                 // get average differences in x and z direction (ATTENTION: the integral images provide just the sum, not divided by number of elements, however, further processing only needs the sum, not the real average)
@@ -499,7 +518,7 @@ private:
         const int max_uy = depth_image_z_dy_transposed.cols - max_scan_line_width - 2;
         const int max_vy = depth_image_z_dy_transposed.rows - max_scan_line_width - 2;
 
-        //#pragma omp parallel for //num_threads(2)
+        #pragma omp parallel for
         for (int v = max_scan_line_width + 1; v < max_vy; ++v)
         {
             int scan_line_width = 10; // width of scan line left or right of a query pixel, measured in [px]
@@ -512,7 +531,7 @@ private:
                 if (depth == 0.f)
                     continue;
 
-                scan_line_width = std::min(int(scan_line_model_m_ * depth + scan_line_model_n_), max_scan_line_width);
+                scan_line_width = std::min(int(scan_line_model_m_ * depth + scan_line_model_n_), max_scan_line_width - 1); //TODO:  max_scan_line_width - 1 is not corresponded with raw code
                 if (scan_line_width <= min_scan_line_width)
                     scan_line_width = last_line_width;
                 else
@@ -520,11 +539,24 @@ private:
 
                 int scan_line_height_upper = scan_line_width;
                 int scan_line_height_lower = scan_line_width;
-                if (AdaptScanLine(scan_line_height_upper, scan_line_height_lower, distance_map_vertical, v, u, min_scan_line_width) == false)
+
+                if (enable_adaptive_scan_line_)
                 {
-                    edge_start_index = -1;
-                    max_edge_strength = 0.f;
-                    continue;
+                    if (AdaptScanLine(scan_line_height_upper, scan_line_height_lower, distance_map_vertical, v, u, min_scan_line_width) == false)
+                    {
+                        edge_start_index = -1;
+                        max_edge_strength = 0.f;
+                        continue;
+                    }
+                }
+                else
+                {
+                    if (edge_integral_.at<int>(u + scan_line_width + 1, v + 1) - edge_integral_.at<int>(u - scan_line_width - 2, v + 1) - edge_integral_.at<int>(u + scan_line_width + 1, v) + edge_integral_.at<int>(u - scan_line_width - 2, v) != 0)
+                    {
+                        edge_start_index = -1;
+                        max_edge_strength = 0.f;
+                        continue;
+                    }
                 }
 
                 const float avg_dx_l = depth_image_y_dy_integral_vertical_.at<float>(v, u - 1) - depth_image_y_dy_integral_vertical_.at<float>(v, u - scan_line_height_upper);
@@ -612,7 +644,7 @@ private:
         const int max_u = depth_image_z_dx_.cols - max_scan_line_width - 2;
         normal_ = cv::Mat::zeros(cv::Size(camera_parameter_.image_width, camera_parameter_.image_height), CV_32FC3);
 
-        //#pragma omp parallel for //num_threads(2)
+        #pragma omp parallel for
         for (int v = max_scan_line_width + 1; v < max_v; ++v)
         {
             int scan_line_width = 10;
@@ -629,7 +661,7 @@ private:
                 }
 
                 // depth dependent scan line width for slope computation (1px width per 0.10m depth)
-                scan_line_width = std::min(int32_t(scan_line_model_m_ * depth + scan_line_model_n_), max_scan_line_width);
+                scan_line_width = std::min(int32_t(scan_line_model_m_ * depth + scan_line_model_n_), max_scan_line_width - 1);
                 if (scan_line_width <= min_scan_line_width)
                     scan_line_width = last_line_width;
                 else
@@ -640,11 +672,23 @@ private:
                 int32_t scan_line_height_upper = scan_line_width;
                 int32_t scan_line_height_lower = scan_line_width;
 
-                if (AdaptScanLineNormal(scan_line_width_left, scan_line_width_right, distance_map_horizontal_, u, v, min_scan_line_width) == false ||
-                    AdaptScanLineNormal(scan_line_height_upper, scan_line_height_lower, distance_map_vertical_, u, v, min_scan_line_width) == false)
+                if (enable_adaptive_scan_line_)
                 {
-                    normal_.at<cv::Vec3f>(u, v) = {0, 0, 0};
-                    continue;
+                    if (AdaptScanLineNormal(scan_line_width_left, scan_line_width_right, distance_map_horizontal_, u, v, min_scan_line_width) == false ||
+                        AdaptScanLineNormal(scan_line_height_upper, scan_line_height_lower, distance_map_vertical_, u, v, min_scan_line_width) == false)
+                    {
+                        normal_.at<cv::Vec3f>(u, v) = {0, 0, 0};
+                        continue;
+                    }
+                }
+                else
+                {
+                    if ((edge_integral_.at<int>(v + 1, u + scan_line_width + 1) - edge_integral_.at<int>(v + 1, u - scan_line_width - 2) - edge_integral_.at<int>(v, u + scan_line_width + 1) + edge_integral_.at<int>(v, u - scan_line_width - 2) != 0) ||
+                        (edge_integral_.at<int>(v + scan_line_width + 1, u + 1) - edge_integral_.at<int>(v - scan_line_width - 2, u + 1) - edge_integral_.at<int>(v + scan_line_width + 1, u) + edge_integral_.at<int>(v - scan_line_width - 2, u) != 0))
+                    {
+                        normal_.at<cv::Vec3f>(u, v) = {0, 0, 0};
+                        continue;
+                    }
                 }
 
                 const float avg_dx1 = depth_image_x_dx_integral_horisontal_.at<float>(v, u + scan_line_width_right) - depth_image_x_dx_integral_horisontal_.at<float>(v, u - scan_line_width_left);
@@ -668,6 +712,10 @@ private:
         }
     }
 
+    cv::Mat depth_image_x_dx_, depth_image_y_dy_, depth_image_z_dx_, depth_image_z_dy_; //Spatial differences of depth image
+    cv::Mat edge_image_;
+
+    bool enable_adaptive_scan_line_;
     omp_lock_t omp_lock_;
     float scan_line_model_n_, scan_line_model_m_;
 
@@ -678,6 +726,6 @@ private:
     cv::Mat distance_map_horizontal_, distance_map_vertical_;
     CameraParameter camera_parameter_;
     bool enable_edge_filter_;
-    cv::Mat edge_;
+    cv::Mat edge_, edge_integral_;
     cv::Mat normal_;
 };

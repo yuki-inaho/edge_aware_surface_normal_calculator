@@ -24,8 +24,6 @@ if (OPENMP_FOUND)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-
-
 pkg_check_modules(OpenCV REQUIRED opencv)
 include_directories(${OpenCV_CFLAGS})
 target_link_libraries(${PROJ_NAME} ${OpenCV_LDFLAGS})
