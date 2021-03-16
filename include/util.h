@@ -31,3 +31,14 @@ void dumpCVMat(std::string name, const cv::Mat &image)
     cv::FileStorage fs(name, cv::FileStorage::WRITE);
     fs << "mat" << image;
 };
+
+void showCVMat(std::string title, const cv::Mat &image)
+{
+    while (true)
+    {
+        cv::imshow(title, image);
+        if (cv::waitKey(10) == 27 || cv::waitKey(10) == 'q')
+            break;
+    }
+    cv::destroyAllWindows();
+};

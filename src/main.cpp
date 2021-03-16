@@ -9,7 +9,7 @@
 using namespace std;
 using namespace cv;
 
-std::string PARENT_DIR = getParentDir();
+std::string WORK_DIR = getParentDir();
 
 struct ParsedArgument
 {
@@ -30,8 +30,11 @@ int main(int argc, char **argv)
 {
     ParsedArgument args = parse_args(argc, argv);
     TomlReader cfg_params(args.config_file_path);
-    std::string image_path = concatDirectoryAndDataNames(cfg_params.ReadStringData("Main", "data_dir"), cfg_params.ReadStringData("Main", "image_name"));
+    cfg_params.ReadStringData("Main", "data_dir");
+    std::string data_dir_path = concatDirectoryAndDataNames(WORK_DIR, cfg_params.ReadStringData("Main", "data_dir"));
+    std::string image_path = concatDirectoryAndDataNames(data_dir_path, cfg_params.ReadStringData("Main", "image_name"));
     cv::Mat depth_image = cv::imread(image_path, cv::IMREAD_ANYDEPTH);
-
+    std::cout << image_path << std::endl;
+    showCVMat("test", depth_image);
     return 0;
 }
