@@ -1,0 +1,11 @@
+[Camera]
+height = 480
+width = 640
+fx = 625.658325195
+fy = 625.260192871
+cx = 329.006195068
+cy = 238.770706177
+
+[Main]
+data_dir = "data"
+image_name = "depth.png"
