@@ -5,9 +5,9 @@
 #include "argparse.hpp"
 #include "toml_reader.h"
 #include "depth_frame.h"
+#include "surface_normal_calculator.h"
 #include "util.h"
 
-using namespace std;
 using namespace cv;
 
 std::string WORK_DIR = getParentDir();
@@ -38,19 +38,21 @@ int main(int argc, char **argv)
 
     std::cout << "Input Image: " << image_path << std::endl;
     cv::Mat depth_image = cv::imread(image_path, cv::IMREAD_ANYDEPTH);
-    std::cout << "width:" << depth_image.cols << " "
-              << "height:" << depth_image.rows << endl;
 
+    // Set Camera Parameters
     CameraParameter camera_parameter = {
         cfg_params.ReadFloatData("Camera", "fx"),
         cfg_params.ReadFloatData("Camera", "fy"),
         cfg_params.ReadFloatData("Camera", "cx"),
         cfg_params.ReadFloatData("Camera", "cy"),
-        cfg_params.ReadIntData("Camera", "width"),
-        cfg_params.ReadIntData("Camera", "height")
+        cfg_params.ReadIntData("Camera", "width"),  //image_width
+        cfg_params.ReadIntData("Camera", "height")  //image_height
     };
 
+    // Set Depth Information
     DepthFrame depth_frame(depth_image, camera_parameter);
+    SurfaceNormalCalculator surface_normal_calculator(camera_parameter);
+    surface_normal_calculator.compute(depth_frame);
 
     //showCVMat("test", depth_image);
 

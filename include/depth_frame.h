@@ -11,6 +11,19 @@ public:
         SetDepthImage(depth_image);
     }
 
+    // TODO: zero copy?
+    cv::Mat get_x_image() const {
+        return frustum_spatial_info_3d_.x_image.clone();
+    }
+
+    cv::Mat get_y_image() const {
+        return frustum_spatial_info_3d_.y_image.clone();
+    }
+
+    cv::Mat get_z_image() const {
+        return frustum_spatial_info_3d_.z_image.clone();
+    }
+
 private:
     void SetDepthImage(const cv::Mat &depth_image)
     {
