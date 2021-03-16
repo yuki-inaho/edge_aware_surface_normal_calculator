@@ -11,6 +11,10 @@ public:
         SetDepthImage(depth_image);
     }
 
+    cv::Mat get_depth_image() const {
+        return depth_image_.clone();
+    }
+
     // TODO: zero copy?
     cv::Mat get_x_image() const {
         return frustum_spatial_info_3d_.x_image.clone();
@@ -22,6 +26,11 @@ public:
 
     cv::Mat get_z_image() const {
         return frustum_spatial_info_3d_.z_image.clone();
+    }
+
+    std::vector<float> get_center_point() const {
+        std::vector<float> center_point = {center_x_, center_y_, center_z_};
+        return center_point;
     }
 
 private:
@@ -52,6 +61,10 @@ private:
         cv::Mat y_image(camera_parameter_.image_height, camera_parameter_.image_width, CV_32FC1);
         cv::Mat z_image(camera_parameter_.image_height, camera_parameter_.image_width, CV_32FC1);
 
+        float center_x = 0;
+        float center_y = 0;
+        float center_z = 0;
+        int32_t count_non_zero = 0;
         for (size_t h = 0; h < depth_image.rows; h++)
         {
             float *x_ptr = (float *)x_image.ptr(h);
@@ -65,6 +78,10 @@ private:
                     *z_ptr = z_value;
                     *x_ptr = z_value * (float(w) - camera_parameter_.cx) * (1.0 / camera_parameter_.fx);
                     *y_ptr = z_value * (float(h) - camera_parameter_.cy) * (1.0 / camera_parameter_.fy);
+                    center_z += *z_ptr;
+                    center_x += *x_ptr;
+                    center_y += *y_ptr;
+                    count_non_zero;
                 }
                 ++x_ptr;
                 ++y_ptr;
@@ -72,9 +89,21 @@ private:
             }
         }
 
+        center_x /= count_non_zero;
+        center_y /= count_non_zero;
+        center_z /= count_non_zero;
+
+        center_x_ = center_x;
+        center_y_ = center_y;
+        center_z_ = center_z;
+
         FrustumSpatialPointInformation frustum_spatial_info_3d = {x_image, y_image, z_image};
         return frustum_spatial_info_3d;
     }
+
+    float center_x_;
+    float center_y_;
+    float center_z_;
 
     cv::Mat depth_image_;
     FrustumSpatialPointInformation frustum_spatial_info_3d_;

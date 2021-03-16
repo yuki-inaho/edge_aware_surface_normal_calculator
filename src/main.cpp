@@ -54,8 +54,8 @@ int main(int argc, char **argv)
     SurfaceNormalCalculator surface_normal_calculator(camera_parameter);
     surface_normal_calculator.compute(depth_frame);
     cv::Mat edge_image = surface_normal_calculator.get_edge_image();
+    cv::Mat surface_normal_image = surface_normal_calculator.get_surface_normal_image();    
 
-
-    showCVMat("test", edge_image);
+    showCVMat("test", colorize_surface_normal(surface_normal_image));
     return 0;
 }

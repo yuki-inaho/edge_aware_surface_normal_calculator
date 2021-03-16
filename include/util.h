@@ -42,3 +42,21 @@ void showCVMat(std::string title, const cv::Mat &image)
     }
     cv::destroyAllWindows();
 };
+
+cv::Mat colorize_surface_normal(const cv::Mat& surface_normal){
+    cv::Mat colorized_image = cv::Mat::zeros(cv::Size(surface_normal.cols, surface_normal.rows), CV_8UC3);
+
+    for (size_t y = 0; y < surface_normal.rows; ++y)
+    {
+        for (size_t x = 0; x < surface_normal.cols; ++x)
+        {
+            if(surface_normal.at<cv::Vec3f>(y,x)[0] != 0 || surface_normal.at<cv::Vec3f>(y,x)[1] != 0 || surface_normal.at<cv::Vec3f>(y,x)[2] != -1){
+                colorized_image.at<cv::Vec3b>(y,x)[0] = uchar(surface_normal.at<cv::Vec3f>(y,x)[0] * 255);
+                colorized_image.at<cv::Vec3b>(y,x)[1] = uchar(surface_normal.at<cv::Vec3f>(y,x)[1] * 255);
+                colorized_image.at<cv::Vec3b>(y,x)[2] = uchar(-1 * surface_normal.at<cv::Vec3f>(y,x)[2] * 255);
+            }
+        }
+    }
+    return colorized_image;
+}
+
