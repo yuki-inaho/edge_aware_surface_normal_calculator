@@ -27,17 +27,6 @@ ParsedArgument parse_args(int argc, char **argv)
     return parsed_args;
 }
 
-void fill_0_far_depth(cv::Mat &depth_image){
-    for (int v = 0; v < depth_image.rows; v++)
-    {
-        for (int u = 0; u < depth_image.cols; u++)
-        {
-            if(depth_image.at<unsigned short>(v, u) == 65535)
-                depth_image.at<unsigned short>(v, u) = 0;
-        }
-    }
-}
-
 int main(int argc, char **argv)
 {
     ParsedArgument args = parse_args(argc, argv);
@@ -49,7 +38,7 @@ int main(int argc, char **argv)
 
     std::cout << "Input Image: " << image_path << std::endl;
     cv::Mat depth_image = cv::imread(image_path, cv::IMREAD_ANYDEPTH);
-    fill_0_far_depth(depth_image);
+    FillZeroFarDepth(depth_image);
 
     // Set Camera Parameters
     CameraParameter camera_parameter = {
@@ -57,8 +46,8 @@ int main(int argc, char **argv)
         cfg_params.ReadFloatData("Camera", "fy"),
         cfg_params.ReadFloatData("Camera", "cx"),
         cfg_params.ReadFloatData("Camera", "cy"),
-        cfg_params.ReadIntData("Camera", "width"),  //image_width
-        cfg_params.ReadIntData("Camera", "height")  //image_height
+        cfg_params.ReadIntData("Camera", "width"), //image_width
+        cfg_params.ReadIntData("Camera", "height") //image_height
     };
 
     // Set Depth Information
@@ -66,9 +55,18 @@ int main(int argc, char **argv)
     SurfaceNormalCalculator surface_normal_calculator(camera_parameter);
     surface_normal_calculator.compute(depth_frame);
     cv::Mat edge_image = surface_normal_calculator.get_edge_image();
-    cv::Mat surface_normal_image = surface_normal_calculator.get_surface_normal_image();    
+    cv::Mat surface_normal_image = surface_normal_calculator.get_surface_normal_image();
 
-    showCVMat("normal", colorize_surface_normal(surface_normal_image));
+    std::vector<std::string> names = {"colorized depth", "normal", "edge"};
+    cv::Mat edge_8uc3;
+    cv::cvtColor(edge_image, edge_8uc3, cv::COLOR_GRAY2BGR);
+    std::vector<cv::Mat> images = {ColorizeDepthImage(depth_image), ColorizeSurfaceNormal(surface_normal_image), edge_8uc3};
+    DrawMultipleImages(names, images);
+    /*
+    showCVMat("colorized depth", ColorizeDepthImage(depth_image));
+    showCVMat("normal", ColorizeSurfaceNormal(surface_normal_image));
     showCVMat("edge", edge_image);
+    */
+
     return 0;
 }
