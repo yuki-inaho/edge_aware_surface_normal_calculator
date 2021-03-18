@@ -7,8 +7,8 @@
 #include "struct.h"
 #include "fast_arithmetic.h"
 
-#define MIN_DISTANCE_TO_DEPTH_EDGE 2
-#define MIN_SCAN_LINE_WIDTH_FRACTION_FROM_MAX 3
+#define MIN_DISTANCE_TO_DEPTH_EDGE 1
+#define MIN_SCAN_LINE_WIDTH_FRACTION_FROM_MAX 1
 
 class SurfaceNormalCalculator
 {
