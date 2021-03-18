@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <omp.h>
 #include <eigen3/Eigen/Dense>
+#include "thinning.hpp"
 #include "depth_frame.h"
 #include "struct.h"
 #include "fast_arithmetic.h"
@@ -35,6 +36,8 @@ public:
         ComputeSpatialDifference(frame);
         ComputeDepthEdge(frame);
         NonMaximumSuppression();
+        thinning(edge_);
+
         if (!enable_adaptive_scan_line_)
             cv::integral(edge_, edge_integral_, CV_32S);
 
@@ -424,7 +427,7 @@ private:
         return true;
     }
 
-    void ScanLineHorisontal(const DepthFrame &frame, cv::Mat &distance_map_horizontal, int32_t max_scan_line_width = 20, int32_t min_scan_line_width = 5, int32_t scan_line_width_init = 10, int32_t min_detectable_edge_angle = 45)
+    void ScanLineHorisontal(const DepthFrame &frame, cv::Mat &distance_map_horizontal, int32_t max_scan_line_width = 20, int32_t min_scan_line_width = 1, int32_t scan_line_width_init = 10, int32_t min_detectable_edge_angle = 45)
     {
         // TODO: zero copy?
         cv::Mat z_image = frame.get_z_image();
@@ -508,7 +511,7 @@ private:
         }
     }
 
-    void ScanLineVertical(const DepthFrame &frame, cv::Mat &distance_map_vertical, int32_t max_scan_line_width = 20, int32_t min_scan_line_width = 5, int32_t scan_line_width_init = 10, int32_t min_detectable_edge_angle = 45)
+    void ScanLineVertical(const DepthFrame &frame, cv::Mat &distance_map_vertical, int32_t max_scan_line_width = 20, int32_t min_scan_line_width = 1, int32_t scan_line_width_init = 10, int32_t min_detectable_edge_angle = 45)
     {
         // TODO: zero copy?
         cv::Mat z_image = frame.get_z_image();
@@ -521,7 +524,7 @@ private:
         #pragma omp parallel for
         for (int v = max_scan_line_width + 1; v < max_vy; ++v)
         {
-            int scan_line_width = 10; // width of scan line left or right of a query pixel, measured in [px]
+            int scan_line_width = scan_line_width_init; // width of scan line left or right of a query pixel, measured in [px]
             int last_line_width = scan_line_width;
             int edge_start_index = -1;
             float max_edge_strength = 0;
@@ -630,7 +633,7 @@ private:
         }
     }
 
-    void ComputeSurfaceNormal(const DepthFrame &frame, int32_t max_scan_line_width = 20, int32_t min_scan_line_width = 5, int32_t scan_line_width_init = 10, int32_t min_detectable_edge_angle = 45)
+    void ComputeSurfaceNormal(const DepthFrame &frame, int32_t max_scan_line_width = 20, int32_t min_scan_line_width = 1, int32_t scan_line_width_init = 10, int32_t min_detectable_edge_angle = 45)
     {
         // TODO: zero copy?
         cv::Mat x_image = frame.get_x_image();
@@ -644,10 +647,10 @@ private:
         const int max_u = depth_image_z_dx_.cols - max_scan_line_width - 2;
         normal_ = cv::Mat::zeros(cv::Size(camera_parameter_.image_width, camera_parameter_.image_height), CV_32FC3);
 
-        #pragma omp parallel for
+        //#pragma omp parallel for
         for (int v = max_scan_line_width + 1; v < max_v; ++v)
         {
-            int scan_line_width = 10;
+            int scan_line_width = scan_line_width_init;
             int last_line_width = scan_line_width;
 
             for (int u = max_scan_line_width + 1; u < max_u; ++u)
@@ -656,7 +659,7 @@ private:
                 const float depth = z_image.at<float>(v, u);
                 if (depth == 0.f || edge_.at<uchar>(v, u) != 0 || v <= max_scan_line_width || v >= max_v || u <= max_scan_line_width || u >= max_u)
                 {
-                    normal_.at<cv::Vec3f>(u, v) = {0, 0, 0};
+                    normal_.at<cv::Vec3f> (v, u) = {0, 0, 0};
                     continue;
                 }
 
@@ -677,7 +680,7 @@ private:
                     if (AdaptScanLineNormal(scan_line_width_left, scan_line_width_right, distance_map_horizontal_, u, v, min_scan_line_width) == false ||
                         AdaptScanLineNormal(scan_line_height_upper, scan_line_height_lower, distance_map_vertical_, u, v, min_scan_line_width) == false)
                     {
-                        normal_.at<cv::Vec3f>(u, v) = {0, 0, 0};
+                        normal_.at<cv::Vec3f>(v, u) = {0, 0, 0};
                         continue;
                     }
                 }
@@ -686,7 +689,7 @@ private:
                     if ((edge_integral_.at<int>(v + 1, u + scan_line_width + 1) - edge_integral_.at<int>(v + 1, u - scan_line_width - 2) - edge_integral_.at<int>(v, u + scan_line_width + 1) + edge_integral_.at<int>(v, u - scan_line_width - 2) != 0) ||
                         (edge_integral_.at<int>(v + scan_line_width + 1, u + 1) - edge_integral_.at<int>(v - scan_line_width - 2, u + 1) - edge_integral_.at<int>(v + scan_line_width + 1, u) + edge_integral_.at<int>(v - scan_line_width - 2, u) != 0))
                     {
-                        normal_.at<cv::Vec3f>(u, v) = {0, 0, 0};
+                        normal_.at<cv::Vec3f>(v, u) = {0, 0, 0};
                         continue;
                     }
                 }

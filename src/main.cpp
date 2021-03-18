@@ -27,6 +27,17 @@ ParsedArgument parse_args(int argc, char **argv)
     return parsed_args;
 }
 
+void fill_0_far_depth(cv::Mat &depth_image){
+    for (int v = 0; v < depth_image.rows; v++)
+    {
+        for (int u = 0; u < depth_image.cols; u++)
+        {
+            if(depth_image.at<unsigned short>(v, u) == 65535)
+                depth_image.at<unsigned short>(v, u) = 0;
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     ParsedArgument args = parse_args(argc, argv);
@@ -38,6 +49,7 @@ int main(int argc, char **argv)
 
     std::cout << "Input Image: " << image_path << std::endl;
     cv::Mat depth_image = cv::imread(image_path, cv::IMREAD_ANYDEPTH);
+    fill_0_far_depth(depth_image);
 
     // Set Camera Parameters
     CameraParameter camera_parameter = {
@@ -56,6 +68,7 @@ int main(int argc, char **argv)
     cv::Mat edge_image = surface_normal_calculator.get_edge_image();
     cv::Mat surface_normal_image = surface_normal_calculator.get_surface_normal_image();    
 
-    showCVMat("test", colorize_surface_normal(surface_normal_image));
+    showCVMat("normal", colorize_surface_normal(surface_normal_image));
+    showCVMat("edge", edge_image);
     return 0;
 }
