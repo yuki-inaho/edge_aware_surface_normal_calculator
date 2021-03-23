@@ -2,3 +2,4 @@ setuptools  #41.2.0
 pybind11==2.6.2
 cmake_build_extension==0.1
 toml==0.10.1
+opencv-python==4.5.1.48
