@@ -1,2 +1,6 @@
 build/
-.vscode/settings.json
+dist/
+.vscode/
+.venv/
+edge_aware_surface_normal_calculator.egg-info/
+pyproject.toml

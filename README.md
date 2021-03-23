@@ -1,3 +1,4 @@
-# Used
-- [argparse: Python like C++ Argument parser](https://github.com/SiLeader/argparse)
-- [toml11](https://github.com/ToruNiina/toml11)
+Implementation of the algorithm written in below article.
+
+Fast and Accurate Normal Estimation by Efficient 3d Edge Detection
+http://publica.fraunhofer.de/documents/N-366490.html
