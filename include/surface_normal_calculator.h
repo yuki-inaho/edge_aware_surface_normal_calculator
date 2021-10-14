@@ -175,9 +175,9 @@ private:
                 dy = floor(dy / slope_norm + 0.5);
                 uchar &edge_uv = edge_.at<uchar>(v, u);
                 if (edge_uv >= edge_.at<uchar>(v + dy, u + dx) && edge_uv >= edge_.at<uchar>(v - dy, u - dx))
-                    edge_uv = (uchar)254; // 254?
+                    edge_uv = (uchar)254;
                 else
-                    edge_refined.at<uchar>(v, u) = 1; // 1?
+                    edge_refined.at<uchar>(v, u) = 1;
             }
         }
 
@@ -335,7 +335,7 @@ private:
         scan_line_length_1 = std::min(scan_line_length_1, free_dist.val[0] - 1 - MIN_DISTANCE_TO_DEPTH_EDGE);
         scan_line_length_2 = std::min(scan_line_length_2, free_dist.val[1] - 1 - MIN_DISTANCE_TO_DEPTH_EDGE);
 
-        if ((scan_line_length_1 < min_line_width || MIN_SCAN_LINE_WIDTH_FRACTION_FRlOM_MAX * scan_line_length_1 < max_1) ||
+        if ((scan_line_length_1 < min_line_width || MIN_SCAN_LINE_WIDTH_FRACTION_FROM_MAX * scan_line_length_1 < max_1) ||
             (scan_line_length_2 < min_line_width || MIN_SCAN_LINE_WIDTH_FRACTION_FROM_MAX * scan_line_length_2 < max_2))
             return false;
         return true;
